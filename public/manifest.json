@@ -1,0 +1,17 @@
+{
+  "name": "AceYourExam",
+  "short_name": "AceYourExam",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e3a8a",
+  "description": "Ace Your Exam — Online Mock Tests, Analytics, and Real Exam Experience",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
