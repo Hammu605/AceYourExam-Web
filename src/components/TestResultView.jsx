@@ -10,7 +10,9 @@ import {
   ArrowLeft, 
   Filter,
   Sparkles,
-  BookOpen
+  BookOpen,
+  Printer,
+  Star
 } from 'lucide-react';
 import { 
   formatDuration, 
@@ -19,8 +21,9 @@ import {
   extractCorrectOptionIndex, 
   extractQuestionExplanation 
 } from '../utils';
+import MathRenderer from './MathRenderer';
 
-export default function TestResultView({ result, onRetake, onBackToDashboard, currentLang = 'English' }) {
+export default function TestResultView({ result, onRetake, onBackToDashboard, currentLang = 'English', onBookmarkToggle, bookmarkedIds = new Set() }) {
   const { test, rawQuestions, answers, timeSpentSeconds, totalSeconds } = result;
 
   const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'CORRECT' | 'INCORRECT' | 'UNATTEMPTED'
@@ -88,7 +91,7 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
       <div className="max-w-4xl mx-auto space-y-6">
         
         {/* Navigation Bar */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <button
             onClick={onBackToDashboard}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all shadow-xs"
@@ -98,6 +101,14 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
           </button>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="hidden sm:flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              title="Print Scorecard"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Report</span>
+            </button>
             <button
               onClick={() => setSelectedLang(prev => prev === 'Hindi' ? 'English' : 'Hindi')}
               className="text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-brand-600 hover:bg-brand-50"
@@ -206,6 +217,8 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
               const qText = extractQuestionText(q, selectedLang);
               const qOptions = extractQuestionOptions(q, selectedLang);
               const explanation = extractQuestionExplanation(q, selectedLang);
+              const qId = q.id || `q_${item.index}`;
+              const isBookmarked = bookmarkedIds.has(qId);
 
               return (
                 <div 
@@ -220,9 +233,29 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
                 >
                   {/* Status header */}
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="font-extrabold text-xs text-slate-600 uppercase tracking-wider">
-                      Question {item.index + 1}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-xs text-slate-600 uppercase tracking-wider">
+                        Question {item.index + 1}
+                      </span>
+                      {onBookmarkToggle && (
+                        <button
+                          onClick={() => onBookmarkToggle({
+                            id: qId,
+                            testId: test.id || test.documentId,
+                            testTitle: test.title,
+                            questionText: qText,
+                            explanation: explanation
+                          })}
+                          className={`p-1 rounded-md transition-colors ${
+                            isBookmarked ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'
+                          }`}
+                          title="Bookmark for Revision"
+                        >
+                          <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-amber-400' : ''}`} />
+                        </button>
+                      )}
+                    </div>
+
                     <div>
                       {item.isCorrect ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-md">
@@ -241,9 +274,9 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
                   </div>
 
                   {/* Question Title */}
-                  <p className="text-slate-900 font-semibold text-base mb-4 select-text">
-                    {qText}
-                  </p>
+                  <div className="text-slate-900 font-semibold text-base mb-4 select-text">
+                    <MathRenderer text={qText} />
+                  </div>
 
                   {/* Image if present */}
                   {(q.imageUrl || q.image) && (
@@ -272,7 +305,7 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
                           className={`p-3 rounded-xl border text-xs sm:text-sm flex items-start gap-2.5 ${optClass}`}
                         >
                           <span className="font-extrabold w-5 shrink-0">{letter}.</span>
-                          <span className="flex-1">{opt}</span>
+                          <span className="flex-1"><MathRenderer text={opt} /></span>
                           {isCorrectOpt && (
                             <span className="text-[10px] font-extrabold text-emerald-700 uppercase bg-emerald-200/70 px-1.5 py-0.5 rounded-sm shrink-0">
                               Correct Answer
@@ -295,7 +328,9 @@ export default function TestResultView({ result, onRetake, onBackToDashboard, cu
                         <BookOpen className="w-3.5 h-3.5 text-brand-600" />
                         <span>Explanation / Solution:</span>
                       </div>
-                      <p className="leading-relaxed select-text">{explanation}</p>
+                      <div className="leading-relaxed select-text">
+                        <MathRenderer text={explanation} />
+                      </div>
                     </div>
                   )}
 

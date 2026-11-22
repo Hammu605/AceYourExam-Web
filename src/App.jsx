@@ -6,6 +6,8 @@ import TestCard from './components/TestCard';
 import UnlockModal from './components/UnlockModal';
 import MockTestRunner from './components/MockTestRunner';
 import TestResultView from './components/TestResultView';
+import StudyFocusTimerModal from './components/StudyFocusTimerModal';
+import BookmarksModal from './components/BookmarksModal';
 import { db, collection, onSnapshot } from './firebase';
 import { normalizeMakerXPath } from './utils';
 import { Sparkles, BookOpen, Layers, RefreshCw, FolderSearch, AlertCircle, X } from 'lucide-react';
@@ -26,6 +28,19 @@ export default function App() {
     }
   });
 
+  const [bookmarkedQuestions, setBookmarkedQuestions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bookmarked_questions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('theme_mode') === 'dark';
+  });
+
   const [selectedLang, setSelectedLang] = useState('English');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSectionTab, setActiveSectionTab] = useState(0); // 0 = All, 1 = Competitive, 2 = Subject-wise
@@ -41,6 +56,8 @@ export default function App() {
   const [unlockTarget, setUnlockTarget] = useState(null);
   const [isDiamondsModalOpen, setIsDiamondsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isFocusTimerOpen, setIsFocusTimerOpen] = useState(false);
+  const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
 
   // Firestore Data
   const [appDirectoryDocs, setAppDirectoryDocs] = useState([]);
@@ -57,6 +74,22 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('unlocked_ids', JSON.stringify(Array.from(unlockedIds)));
   }, [unlockedIds]);
+
+  // Save bookmarks
+  useEffect(() => {
+    localStorage.setItem('bookmarked_questions', JSON.stringify(bookmarkedQuestions));
+  }, [bookmarkedQuestions]);
+
+  // Apply dark mode class
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme_mode', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme_mode', 'light');
+    }
+  }, [isDarkMode]);
 
   // Realtime Firebase Listeners
   useEffect(() => {
@@ -183,6 +216,26 @@ export default function App() {
     });
   }, [allTests, currentFolder, searchQuery]);
 
+  // Bookmark handlers
+  const bookmarkedIdsSet = useMemo(() => {
+    return new Set(bookmarkedQuestions.map(b => b.id));
+  }, [bookmarkedQuestions]);
+
+  const handleToggleBookmark = (item) => {
+    setBookmarkedQuestions(prev => {
+      const exists = prev.some(b => b.id === item.id);
+      if (exists) {
+        return prev.filter(b => b.id !== item.id);
+      } else {
+        return [item, ...prev];
+      }
+    });
+  };
+
+  const handleRemoveBookmark = (id) => {
+    setBookmarkedQuestions(prev => prev.filter(b => b.id !== id));
+  };
+
   // Unlock test or folder handler
   const handleConfirmUnlock = (item, cost) => {
     if (diamonds < cost) return;
@@ -213,13 +266,14 @@ export default function App() {
       <MockTestRunner
         test={activeTest}
         initialLang={selectedLang}
+        bookmarkedIds={bookmarkedIdsSet}
+        onBookmarkToggle={handleToggleBookmark}
         onSubmitTest={(result) => {
           setActiveTest(null);
           setTestResult(result);
         }}
         onExit={() => {
           setActiveTest(null);
-          // remove query param if any
           const url = new URL(window.location.href);
           url.searchParams.delete('testId');
           window.history.replaceState({}, '', url.toString());
@@ -234,6 +288,8 @@ export default function App() {
       <TestResultView
         result={testResult}
         currentLang={selectedLang}
+        bookmarkedIds={bookmarkedIdsSet}
+        onBookmarkToggle={handleToggleBookmark}
         onRetake={() => {
           const testToRetake = testResult.test;
           setTestResult(null);
@@ -250,7 +306,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col transition-colors">
       {/* 1. Header Navigation */}
       <Header
         diamonds={diamonds}
@@ -260,6 +316,11 @@ export default function App() {
         selectedLang={selectedLang}
         onToggleLang={() => setSelectedLang(prev => prev === 'Hindi' ? 'English' : 'Hindi')}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenFocusTimer={() => setIsFocusTimerOpen(true)}
+        onOpenBookmarks={() => setIsBookmarksOpen(true)}
+        bookmarksCount={bookmarkedQuestions.length}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
       />
 
       {/* 2. Main Container */}
@@ -277,7 +338,7 @@ export default function App() {
 
         {/* Section Tabs (Only on Root level when not searching) */}
         {!currentFolder && !searchQuery && (
-          <div className="flex items-center gap-2 mb-6 border-b border-slate-200 pb-3 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 mb-6 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto no-scrollbar">
             {[
               { id: 0, label: 'All Exams & Series' },
               { id: 1, label: '🏆 Competitive Exams' },
@@ -288,8 +349,8 @@ export default function App() {
                 onClick={() => setActiveSectionTab(tab.id)}
                 className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all shrink-0 cursor-pointer ${
                   activeSectionTab === tab.id
-                    ? 'bg-brand-900 text-white shadow-xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    ? 'bg-brand-900 dark:bg-brand-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
                 }`}
               >
                 {tab.label}
@@ -301,12 +362,12 @@ export default function App() {
         {/* Search Results Heading */}
         {searchQuery && (
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-bold text-slate-800">
-              Search Results for <span className="text-brand-600 font-black">"{searchQuery}"</span>
+            <h2 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white">
+              Search Results for <span className="text-brand-600 dark:text-brand-400 font-black">"{searchQuery}"</span>
             </h2>
             <button
               onClick={() => setSearchQuery('')}
-              className="text-xs font-semibold text-brand-600 hover:underline"
+              className="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline"
             >
               Clear Search
             </button>
@@ -326,11 +387,11 @@ export default function App() {
             {childFolders.length > 0 && !searchQuery && (
               <div>
                 <div className="flex items-center justify-between mb-3.5">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-4 h-4 text-brand-600" />
+                  <h3 className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-brand-600 dark:text-brand-400" />
                     <span>{currentFolder ? 'Sub-Folders & Papers' : 'Available Series Categories'}</span>
                   </h3>
-                  <span className="text-xs text-slate-500 font-semibold">{childFolders.length} folders</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{childFolders.length} folders</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -358,17 +419,17 @@ export default function App() {
             {(currentFolder || searchQuery) && (
               <div>
                 <div className="flex items-center justify-between mb-3.5">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-xs font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span>Mock Tests ({currentTests.length})</span>
                   </h3>
                 </div>
 
                 {currentTests.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-400">
-                    <FolderSearch className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="text-sm font-semibold text-slate-600">No mock tests found in this folder yet.</p>
-                    <p className="text-xs text-slate-400 mt-1">Tests added via Mekar-X or approved in Admin-X will appear here automatically.</p>
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 p-10 text-center text-slate-400">
+                    <FolderSearch className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                    <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No mock tests found in this folder yet.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Tests added via Mekar-X or approved in Admin-X will appear here automatically.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -392,9 +453,9 @@ export default function App() {
       </main>
 
       {/* 3. Footer */}
-      <footer className="mt-auto bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        <p className="font-semibold text-slate-700">AceYourExam Web — Built for iOS, Android & Desktop</p>
-        <p className="text-[11px] text-slate-400 mt-1">Real-time sync with Google Firebase • All Rights Reserved</p>
+      <footer className="mt-auto bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p className="font-semibold text-slate-700 dark:text-slate-300">AceYourExam Web Edition — Designed for Apple iOS, Android & Desktop</p>
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Real-time sync with Google Firebase • Math Equations with KaTeX</p>
       </footer>
 
       {/* Unlock Series Modal */}
@@ -410,19 +471,37 @@ export default function App() {
         }}
       />
 
+      {/* Study Focus Timer Modal */}
+      <StudyFocusTimerModal
+        isOpen={isFocusTimerOpen}
+        onClose={() => setIsFocusTimerOpen(false)}
+        onRewardDiamonds={(amount) => {
+          setDiamonds(prev => prev + amount);
+          alert(`🎉 Awesome focus! +${amount} Diamonds added to your balance!`);
+        }}
+      />
+
+      {/* Revision Bookmarks Modal */}
+      <BookmarksModal
+        isOpen={isBookmarksOpen}
+        onClose={() => setIsBookmarksOpen(false)}
+        bookmarkedQuestions={bookmarkedQuestions}
+        onRemoveBookmark={handleRemoveBookmark}
+      />
+
       {/* Diamonds Top-Up / Info Modal */}
       {isDiamondsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center relative border border-slate-100 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 text-center relative border border-slate-100 dark:border-slate-800 shadow-2xl">
             <button onClick={() => setIsDiamondsModalOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
             <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 text-3xl">
               💎
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-1">Diamond Balance</h3>
-            <div className="text-3xl font-extrabold text-amber-900 my-2">{diamonds} 💎</div>
-            <p className="text-xs text-slate-500 mb-6">
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">Diamond Balance</h3>
+            <div className="text-3xl font-extrabold text-amber-900 dark:text-amber-400 my-2">{diamonds} 💎</div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
               Use diamonds to unlock paid mock tests and comprehensive test series.
             </p>
             <button
@@ -431,7 +510,7 @@ export default function App() {
                 alert("💎 Claimed +100 Daily Free Diamonds!");
                 setIsDiamondsModalOpen(false);
               }}
-              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold rounded-xl text-sm shadow-md active:scale-95 transition-all"
+              className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold rounded-xl text-sm shadow-md active:scale-95 transition-all cursor-pointer"
             >
               Claim +100 Free Diamonds
             </button>
@@ -442,34 +521,38 @@ export default function App() {
       {/* Student Profile Modal */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center relative border border-slate-100 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 text-center relative border border-slate-100 dark:border-slate-800 shadow-2xl">
             <button onClick={() => setIsProfileModalOpen(false)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
-            <div className="w-16 h-16 rounded-2xl bg-brand-50 text-brand-700 flex items-center justify-center mx-auto mb-3 font-black text-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300 flex items-center justify-center mx-auto mb-3 font-black text-2xl">
               AY
             </div>
-            <h3 className="text-lg font-bold text-slate-900">AceYourExam Student</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">AceYourExam Student</h3>
             <p className="text-xs text-slate-400 mb-4">Web Edition User</p>
             
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-left mb-6 space-y-2">
+            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-left mb-6 space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-500">Device / Browser:</span>
-                <span className="font-semibold text-slate-800">Supported (iOS/Web)</span>
+                <span className="text-slate-500 dark:text-slate-400">Device / Browser:</span>
+                <span className="font-semibold text-slate-800 dark:text-white">Supported (Apple iOS/Web)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Database Sync:</span>
-                <span className="font-semibold text-emerald-600">● Live (Firebase)</span>
+                <span className="text-slate-500 dark:text-slate-400">Database Sync:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">● Live (Firebase)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Unlocked Tests:</span>
-                <span className="font-semibold text-brand-600">{unlockedIds.size}</span>
+                <span className="text-slate-500 dark:text-slate-400">Saved Bookmarks:</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">{bookmarkedQuestions.length} Questions</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Unlocked Tests:</span>
+                <span className="font-semibold text-brand-600 dark:text-brand-400">{unlockedIds.size}</span>
               </div>
             </div>
 
             <button
               onClick={() => setIsProfileModalOpen(false)}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-colors"
             >
               Close
             </button>

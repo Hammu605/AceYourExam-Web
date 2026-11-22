@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Clock, 
   HelpCircle, 
@@ -11,7 +11,11 @@ import {
   Send,
   Globe,
   Menu,
-  X
+  X,
+  Maximize2,
+  Minimize2,
+  Star,
+  Sparkles
 } from 'lucide-react';
 import { 
   formatDuration, 
@@ -20,10 +24,12 @@ import {
   extractCorrectOptionIndex, 
   extractQuestionExplanation 
 } from '../utils';
+import MathRenderer from './MathRenderer';
 
-export default function MockTestRunner({ test, initialLang = 'English', onSubmitTest, onExit }) {
+export default function MockTestRunner({ test, initialLang = 'English', onSubmitTest, onExit, onBookmarkToggle, bookmarkedIds = new Set() }) {
   const [currentLang, setCurrentLang] = useState(initialLang);
   const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Timer state
   const totalSeconds = test.durationSeconds || ((test.timeLimitMinutes || 60) * 60);
@@ -53,6 +59,19 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
         }
       ];
 
+  // Group questions by Subject / Section if available
+  const sections = useMemo(() => {
+    const map = new Map();
+    rawQuestions.forEach((q, idx) => {
+      const secName = q.subject || q.section || q.sectionName || 'General';
+      if (!map.has(secName)) map.set(secName, []);
+      map.get(secName).push(idx);
+    });
+    return Array.from(map.entries()).map(([name, indices]) => ({ name, indices }));
+  }, [rawQuestions]);
+
+  const [activeSectionIdx, setActiveSectionIdx] = useState(0);
+
   // Tick timer
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -75,7 +94,28 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
   // Mark visited on index change
   useEffect(() => {
     setVisitedIndices(prev => new Set(prev).add(currentQIndex));
-  }, [currentQIndex]);
+    // update active section tab if current question belongs to another section
+    sections.forEach((sec, sIdx) => {
+      if (sec.indices.includes(currentQIndex)) {
+        setActiveSectionIdx(sIdx);
+      }
+    });
+  }, [currentQIndex, sections]);
+
+  // Keyboard navigation shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === '1') handleSelectOption(0);
+      else if (e.key === '2') handleSelectOption(1);
+      else if (e.key === '3') handleSelectOption(2);
+      else if (e.key === '4') handleSelectOption(3);
+      else if (e.key === 'ArrowRight' || e.key === 'n') handleSaveAndNext();
+      else if (e.key === 'ArrowLeft' || e.key === 'p') setCurrentQIndex(prev => Math.max(0, prev - 1));
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentQIndex, rawQuestions.length]);
 
   const currentQ = rawQuestions[currentQIndex] || rawQuestions[0];
   const qText = extractQuestionText(currentQ, currentLang);
@@ -122,8 +162,19 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
     }
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
+
   const handleFinalSubmit = () => {
     setShowSubmitModal(false);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
     const timeSpentSeconds = totalSeconds - timeLeft;
     onSubmitTest({
       test,
@@ -152,42 +203,56 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
   const markedCount = markedIndices.size;
   const unattemptedCount = rawQuestions.length - answeredCount;
 
+  const currentQId = currentQ.id || `q_${currentQIndex}`;
+  const isCurrentBookmarked = bookmarkedIds.has(currentQId);
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col overflow-hidden font-sans select-none">
       
       {/* 1. Exam Top Navigation Bar */}
-      <header className="h-16 bg-brand-900 text-white px-4 sm:px-6 flex items-center justify-between shadow-md shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="h-16 bg-brand-900 text-white px-3 sm:px-6 flex items-center justify-between shadow-md shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => {
               if (window.confirm("Are you sure you want to quit the test? Your current progress will be lost.")) {
+                if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
                 onExit();
               }
             }}
             className="text-xs bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg font-semibold transition-all"
           >
-            Exit Test
+            Exit
           </button>
           <div>
-            <h2 className="text-sm sm:text-base font-extrabold tracking-tight truncate max-w-[200px] sm:max-w-md">
+            <h2 className="text-xs sm:text-base font-extrabold tracking-tight truncate max-w-[140px] sm:max-w-md">
               {test.title}
             </h2>
             <div className="text-[10px] text-brand-200">
-              Question {currentQIndex + 1} of {rawQuestions.length}
+              Q {currentQIndex + 1} / {rawQuestions.length}
             </div>
           </div>
         </div>
 
         {/* Center: Live Countdown Timer */}
-        <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-xl font-mono text-sm sm:text-base font-black shadow-inner ${
+        <div className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-xl font-mono text-xs sm:text-base font-black shadow-inner ${
           timeLeft < 300 ? 'bg-rose-500 text-white animate-pulse' : 'bg-brand-950/70 text-amber-300 border border-brand-800'
         }`}>
           <Clock className="w-4 h-4" />
           <span>{formatDuration(timeLeft)}</span>
         </div>
 
-        {/* Right Controls: Language, Palette Toggle & Submit */}
-        <div className="flex items-center gap-2">
+        {/* Right Controls: Fullscreen, Language, Palette Toggle & Submit */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="hidden sm:flex p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all"
+            title="Toggle Fullscreen Mode"
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
           {/* Language Toggle */}
           <button
             onClick={() => setCurrentLang(prev => prev === 'Hindi' ? 'English' : 'Hindi')}
@@ -210,27 +275,85 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
           {/* Submit Button */}
           <button
             onClick={() => setShowSubmitModal(true)}
-            className="hidden sm:flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-md active:scale-95 transition-all cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-md active:scale-95 transition-all cursor-pointer"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3.5 h-3.5" />
             <span>Submit</span>
           </button>
         </div>
       </header>
 
-      {/* 2. Main Content Area: Left Question Area + Right Question Palette */}
+      {/* 2. Section Subject Tabs Bar (If multi-subject/sections) */}
+      {sections.length > 1 && (
+        <div className="bg-white border-b border-slate-200 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 h-11">
+          <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0 mr-1">Section:</span>
+          {sections.map((sec, sIdx) => {
+            const isSecActive = activeSectionIdx === sIdx;
+            const secAnswered = sec.indices.filter(i => answers[i] !== undefined).length;
+            return (
+              <button
+                key={sec.name}
+                onClick={() => {
+                  setActiveSectionIdx(sIdx);
+                  if (!sec.indices.includes(currentQIndex)) {
+                    setCurrentQIndex(sec.indices[0]);
+                  }
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                  isSecActive
+                    ? 'bg-brand-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <span>{sec.name}</span>
+                <span className={`text-[10px] px-1 rounded-sm ${isSecActive ? 'bg-brand-800 text-brand-200' : 'bg-slate-200 text-slate-500'}`}>
+                  {secAnswered}/{sec.indices.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 3. Main Content Area: Left Question Area + Right Question Palette */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* Left: Active Question Screen */}
         <main className="flex-1 flex flex-col bg-slate-50 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col justify-between">
             
-            {/* Question Header */}
+            {/* Question Header & Bookmark */}
             <div>
               <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-                <span className="font-extrabold text-slate-800 text-base sm:text-lg">
-                  Question {currentQIndex + 1}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-slate-800 text-base sm:text-lg">
+                    Question {currentQIndex + 1}
+                  </span>
+                  
+                  {/* Star / Bookmark Button */}
+                  <button
+                    onClick={() => {
+                      if (onBookmarkToggle) {
+                        onBookmarkToggle({
+                          id: currentQId,
+                          testId: test.id || test.documentId,
+                          testTitle: test.title,
+                          questionText: qText,
+                          explanation: extractQuestionExplanation(currentQ, currentLang)
+                        });
+                      }
+                    }}
+                    className={`p-1.5 rounded-lg border transition-all ${
+                      isCurrentBookmarked 
+                        ? 'bg-amber-50 border-amber-300 text-amber-500' 
+                        : 'bg-white border-slate-200 text-slate-400 hover:text-amber-500'
+                    }`}
+                    title={isCurrentBookmarked ? "Remove Bookmark" : "Save for Revision"}
+                  >
+                    <Star className={`w-4 h-4 ${isCurrentBookmarked ? 'fill-amber-400' : ''}`} />
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-2 text-xs">
                   <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md border border-emerald-300">
                     +{test.positiveMarks || 1.0}
@@ -243,9 +366,9 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
                 </div>
               </div>
 
-              {/* Question Text */}
+              {/* Question Text with MathRenderer */}
               <div className="text-slate-900 text-base sm:text-lg font-medium leading-relaxed mb-6 select-text">
-                {qText || 'Question text not available.'}
+                <MathRenderer text={qText || 'Question text not available.'} />
               </div>
 
               {/* Question Image if available */}
@@ -283,7 +406,7 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
                         {letter}
                       </div>
                       <div className="flex-1 text-sm sm:text-base text-slate-800 pt-0.5 font-medium leading-snug">
-                        {optText}
+                        <MathRenderer text={optText} />
                       </div>
                     </div>
                   );
@@ -372,7 +495,7 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
             </div>
           </div>
 
-          {/* Question Numbers Grid */}
+          {/* Question Numbers Grid (Filtered by activeSection if multi-section) */}
           <div className="flex-1 p-4 overflow-y-auto">
             <div className="grid grid-cols-5 gap-2">
               {rawQuestions.map((_, idx) => {
@@ -417,7 +540,7 @@ export default function MockTestRunner({ test, initialLang = 'English', onSubmit
 
       </div>
 
-      {/* 3. Final Submit Confirmation Modal */}
+      {/* 4. Final Submit Confirmation Modal */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
