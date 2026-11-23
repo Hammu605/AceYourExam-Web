@@ -4,22 +4,30 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+        ace: {
+          green: '#16A34A',
+          'green-dark': '#0F4739',
+          'green-deep': '#0D3A2F',
+          'green-light': '#E8F5E9',
+          'green-tint': '#DCFCE7',
+          sky: '#0284C7',
+          'sky-light': '#E0F2FE',
+          orange: '#F59E0B',
+          'orange-light': '#FEF3C7',
+          bg: '#F8FAFC',
+          surface: '#FFFFFF',
+          text: '#0F172A',
+          muted: '#64748B',
+          border: '#E2E8F0',
         }
       },
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       }
     },
   },
