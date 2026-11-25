@@ -124,7 +124,7 @@ export default function AppDrawer({
           </a>
 
           <a
-            href="https://xsupreme.world/#privacy-policy"
+            href="./privacy-policy.html"
             target="_blank"
             rel="noreferrer"
             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200"
@@ -136,7 +136,7 @@ export default function AppDrawer({
           </a>
 
           <a
-            href="https://xsupreme.world/#terms"
+            href="./terms.html"
             target="_blank"
             rel="noreferrer"
             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200"
@@ -148,14 +148,26 @@ export default function AppDrawer({
           </a>
 
           <a
-            href="https://xsupreme.world/#feedback"
+            href="./delete-account.html"
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-red-600 dark:text-red-400"
+          >
+            <div className="flex items-center gap-3">
+              <ExternalLink className="w-4 h-4" />
+              <span>Delete Account</span>
+            </div>
+          </a>
+
+          <a
+            href="./faqs.html"
             target="_blank"
             rel="noreferrer"
             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200"
           >
             <div className="flex items-center gap-3">
               <MessageSquare className="w-4 h-4 text-slate-400" />
-              <span>Share Feedback</span>
+              <span>FAQs</span>
             </div>
           </a>
 
