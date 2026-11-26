@@ -1,194 +1,246 @@
-import React, { useState } from 'react';
-import { Trophy, Medal, Award, Flame, Star, Sparkles } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Trophy, Flame, Clock, MessageCircle, X, Crown, Sparkles, Search } from 'lucide-react';
+import { db, collection, onSnapshot } from '../firebase';
+import { getDinoById } from '../services/userSync';
 
-const TOP_THREE = [
-  {
-    rank: 1,
-    name: 'Aarav Sharma',
-    handle: '@aarav_ias',
-    accuracy: '99%',
-    hours: '19h 45m',
-    points: 4850,
-    avatarBg: 'bg-amber-500',
-    initial: 'A'
-  },
-  {
-    rank: 2,
-    name: 'Bhavya Patel',
-    handle: '@bhavya_ssc',
-    accuracy: '98%',
-    hours: '18h 10m',
-    points: 4620,
-    avatarBg: 'bg-sky-500',
-    initial: 'B'
-  },
-  {
-    rank: 3,
-    name: 'Chirag Verma',
-    handle: '@chirag_rrb',
-    accuracy: '96%',
-    hours: '16h 30m',
-    points: 4390,
-    avatarBg: 'bg-orange-600',
-    initial: 'C'
-  }
-];
+export default function WorldScreen({ currentUid, onStartDirectChat }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterTab, setFilterTab] = useState('ALL_TIME'); // ALL_TIME | STREAK | STUDY
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
 
-const LEADERBOARD_LIST = [
-  { rank: 4, name: 'Divya Rajput', handle: '@divya_upsc', accuracy: '95%', hours: '15h 20m', score: 4180 },
-  { rank: 5, name: 'Eklavya Singh', handle: '@eklavya_cgl', accuracy: '94%', hours: '14h 50m', score: 3950 },
-  { rank: 6, name: 'Farhan Khan', handle: '@farhan_bank', accuracy: '93%', hours: '13h 40m', score: 3820 },
-  { rank: 7, name: 'Garima Mehta', handle: '@garima_tet', accuracy: '92%', hours: '12h 15m', score: 3690 },
-  { rank: 8, name: 'Harman Preet', handle: '@harman_ace', accuracy: '91%', hours: '11h 30m', score: 3510 },
-  { rank: 9, name: 'Ishaan Gupta', handle: '@ishaan_nda', accuracy: '90%', hours: '10h 45m', score: 3380 },
-  { rank: 10, name: 'Jasleen Kaur', handle: '@jasleen_law', accuracy: '89%', hours: '9h 55m', score: 3200 }
-];
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'users'),
+      (snap) => {
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(u => !u.isBanned && !u.banned && (u.displayName || u.name));
+        setUsers(list);
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+    return () => unsub();
+  }, []);
 
-export default function WorldScreen() {
-  const [timeFilter, setTimeFilter] = useState('WEEKLY'); // 'TODAY' | 'WEEKLY' | 'ALL_TIME'
+  const rankedUsers = useMemo(() => {
+    const sorted = [...users].sort((a, b) => {
+      if (filterTab === 'STREAK') return (b.streak || 0) - (a.streak || 0) || (b.xp || 0) - (a.xp || 0);
+      if (filterTab === 'STUDY') return (b.totalStudySeconds || 0) - (a.totalStudySeconds || 0);
+      return (b.xp || b.testsAttempted * 20 || 0) - (a.xp || a.testsAttempted * 20 || 0);
+    });
+    if (!searchQuery.trim()) return sorted;
+    const q = searchQuery.toLowerCase();
+    return sorted.filter(u =>
+      (u.displayName || u.name || '').toLowerCase().includes(q) ||
+      (u.handle || '').toLowerCase().includes(q)
+    );
+  }, [users, filterTab, searchQuery]);
+
+  const top3 = rankedUsers.slice(0, 3);
+  const rest = rankedUsers.slice(3, 50);
+
+  const getMetricLabel = (u) => {
+    if (filterTab === 'STREAK') return `${u.streak || 0}d streak`;
+    if (filterTab === 'STUDY') return `${Math.round((u.totalStudySeconds || 0) / 60)}m`;
+    return `${u.xp || (u.testsAttempted || 0) * 20} XP`;
+  };
 
   return (
-    <div className="pb-28 pt-4 px-4 sm:px-6 max-w-lg mx-auto space-y-6">
-      
-      {/* Header */}
-      <div className="text-center">
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center justify-center gap-2">
-          <Trophy className="w-6 h-6 text-amber-500 fill-amber-400" />
-          <span>Global Leaderboard</span>
-        </h2>
-        <p className="text-xs text-slate-500 mt-0.5">Top rankers across all mock test series & study streak</p>
-      </div>
-
-      {/* Filter Switcher */}
-      <div className="bg-[#F8FAFC] dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-center gap-1">
-        {[
-          { id: 'TODAY', label: 'Today' },
-          { id: 'WEEKLY', label: 'This Week' },
-          { id: 'ALL_TIME', label: 'All Time' }
-        ].map(f => (
-          <button
-            key={f.id}
-            onClick={() => setTimeFilter(f.id)}
-            className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              timeFilter === f.id 
-                ? 'bg-[#0F4739] text-white shadow-xs' 
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 3D PODIUM GRAPH (Matching Android WorldScreen.kt) */}
-      <div className="bg-gradient-to-b from-[#E8F5E9]/60 to-white dark:from-slate-800 dark:to-slate-900 rounded-3xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-xs">
-        <div className="flex items-end justify-center gap-2 sm:gap-4 pt-10 pb-2">
-          
-          {/* #2 Rank: Left Sky Blue Pillar */}
-          <div className="flex flex-col items-center flex-1 max-w-[100px]">
-            <div className="relative mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-sky-500 text-white font-black text-lg flex items-center justify-center shadow-md">
-                {TOP_THREE[1].initial}
-              </div>
-              <span className="absolute -top-2 -right-2 w-5 h-5 bg-sky-100 text-sky-800 text-[10px] font-black rounded-full flex items-center justify-center border border-sky-300">
-                2
-              </span>
+    <div className="min-h-screen bg-ace-bg dark:bg-slate-950 pb-28">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-br from-emerald-600 via-ace-green to-teal-700 text-white px-4 pt-5 pb-6 rounded-b-[28px] shadow-lg">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="font-pixelTitle text-sm tracking-tight flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-300" /> WORLD RANKING
+              </h1>
+              <p className="text-xs text-emerald-100 mt-1">Live leaderboard synced with AceYourExam Android & iOS</p>
             </div>
-            <span className="text-[11px] font-extrabold text-slate-800 dark:text-white truncate max-w-full">
-              {TOP_THREE[1].name.split(' ')[0]}
+            <span className="px-2.5 py-1 rounded-full bg-white/15 text-[11px] font-extrabold">
+              {users.length} Scholars
             </span>
-            <span className="text-[9px] font-bold text-sky-600 dark:text-sky-400">
-              {TOP_THREE[1].accuracy}
-            </span>
-
-            {/* Pillar */}
-            <div className="w-full h-24 bg-gradient-to-t from-sky-600 to-sky-400 rounded-t-2xl shadow-md mt-2 flex flex-col items-center justify-center text-white">
-              <span className="font-black text-xl">#2</span>
-              <span className="text-[9px] font-bold opacity-90">{TOP_THREE[1].points} pts</span>
-            </div>
           </div>
 
-          {/* #1 Rank: Center Tallest Gold Pillar */}
-          <div className="flex flex-col items-center flex-1 max-w-[110px] -mt-6">
-            <Trophy className="w-8 h-8 text-amber-500 fill-amber-400 animate-bounce mb-1" />
-            <div className="relative mb-2">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white font-black text-xl flex items-center justify-center shadow-lg ring-4 ring-amber-300/40">
-                {TOP_THREE[0].initial}
-              </div>
-              <span className="absolute -top-2 -right-2 w-6 h-6 bg-amber-400 text-white text-xs font-black rounded-full flex items-center justify-center border-2 border-white shadow-xs">
-                👑
-              </span>
-            </div>
-            <span className="text-xs font-black text-slate-900 dark:text-white truncate max-w-full">
-              {TOP_THREE[0].name.split(' ')[0]}
-            </span>
-            <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
-              {TOP_THREE[0].accuracy} • {TOP_THREE[0].hours}
-            </span>
-
-            {/* Pillar */}
-            <div className="w-full h-36 bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-2xl shadow-lg mt-2 flex flex-col items-center justify-center text-white">
-              <span className="font-black text-2xl">#1</span>
-              <span className="text-[10px] font-extrabold opacity-90">{TOP_THREE[0].points} pts</span>
-            </div>
+          <div className="flex gap-2 mt-3">
+            {[
+              { id: 'ALL_TIME', label: 'Top XP' },
+              { id: 'STREAK', label: 'Streaks' },
+              { id: 'STUDY', label: 'Study Time' }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setFilterTab(t.id)}
+                className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition-all ${
+                  filterTab === t.id
+                    ? 'bg-white text-ace-green shadow'
+                    : 'bg-white/15 text-white hover:bg-white/25'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-
-          {/* #3 Rank: Right Bronze Pillar */}
-          <div className="flex flex-col items-center flex-1 max-w-[100px]">
-            <div className="relative mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-orange-600 text-white font-black text-lg flex items-center justify-center shadow-md">
-                {TOP_THREE[2].initial}
-              </div>
-              <span className="absolute -top-2 -right-2 w-5 h-5 bg-orange-100 text-orange-900 text-[10px] font-black rounded-full flex items-center justify-center border border-orange-300">
-                3
-              </span>
-            </div>
-            <span className="text-[11px] font-extrabold text-slate-800 dark:text-white truncate max-w-full">
-              {TOP_THREE[2].name.split(' ')[0]}
-            </span>
-            <span className="text-[9px] font-bold text-orange-600 dark:text-orange-400">
-              {TOP_THREE[2].accuracy}
-            </span>
-
-            {/* Pillar */}
-            <div className="w-full h-20 bg-gradient-to-t from-orange-700 to-orange-500 rounded-t-2xl shadow-md mt-2 flex flex-col items-center justify-center text-white">
-              <span className="font-black text-xl">#3</span>
-              <span className="text-[9px] font-bold opacity-90">{TOP_THREE[2].points} pts</span>
-            </div>
-          </div>
-
         </div>
       </div>
 
-      {/* Leaderboard Table List (Ranks 4+) */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
-        <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2 px-1">Top Achievers</h4>
-        {LEADERBOARD_LIST.map((user) => (
-          <div
-            key={user.rank}
-            className="flex items-center justify-between p-3 rounded-2xl bg-[#F8FAFC] dark:bg-slate-800/60 hover:bg-[#E8F5E9]/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-6 text-center font-black text-xs text-slate-400">
-                #{user.rank}
-              </span>
-              <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-700 font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs">
-                {user.name.charAt(0)}
-              </div>
-              <div>
-                <h5 className="font-extrabold text-xs text-slate-900 dark:text-white">{user.name}</h5>
-                <span className="text-[10px] text-slate-400">{user.handle}</span>
-              </div>
-            </div>
+      <div className="max-w-3xl mx-auto px-4 mt-4 space-y-4">
+        {/* Search */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search scholar by name or @handle..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-800 dark:text-white focus:outline-none focus:border-ace-green"
+          />
+        </div>
 
-            <div className="text-right">
-              <span className="font-black text-xs text-emerald-700 dark:text-emerald-400 block">{user.score} pts</span>
-              <span className="text-[10px] text-slate-400">{user.accuracy} accuracy</span>
+        {loading ? (
+          <div className="text-center py-12 text-xs font-bold text-slate-400">Loading live leaderboard...</div>
+        ) : rankedUsers.length === 0 ? (
+          <div className="text-center py-12 text-xs font-bold text-slate-400">No scholars found.</div>
+        ) : (
+          <>
+            {/* 3D Podium for Top 3 */}
+            {!searchQuery.trim() && top3.length >= 1 && (
+              <div className="grid grid-cols-3 gap-2.5 items-end pt-3 pb-1">
+                {[top3[1], top3[0], top3[2]].map((u, slotIdx) => {
+                  if (!u) return <div key={slotIdx} />;
+                  const rank = slotIdx === 1 ? 1 : slotIdx === 0 ? 2 : 3;
+                  const dino = getDinoById(u.selectedDinoId || 1);
+                  const podiumStyles =
+                    rank === 1
+                      ? 'bg-gradient-to-b from-amber-400 to-amber-500 text-white h-36 border-amber-300'
+                      : rank === 2
+                      ? 'bg-gradient-to-b from-sky-400 to-sky-600 text-white h-28 border-sky-300'
+                      : 'bg-gradient-to-b from-orange-400 to-rose-500 text-white h-24 border-orange-300';
+
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => setSelectedUser(u)}
+                      className="bouncy-tap flex flex-col items-center text-center group"
+                    >
+                      <div className="relative mb-1.5">
+                        {rank === 1 && <Crown className="w-5 h-5 text-amber-400 mx-auto mb-0.5 drop-shadow" />}
+                        <div className={`w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 p-1.5 border-2 shadow-md ${rank === 1 ? 'border-amber-400 scale-110' : 'border-slate-200 dark:border-slate-700'}`}>
+                          <img src={dino.img} alt={u.displayName || u.name} className="w-full h-full object-contain" />
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-extrabold text-slate-800 dark:text-white truncate w-full px-1">
+                        {u.displayName || u.name}
+                      </span>
+                      <div className={`w-full mt-1 rounded-t-2xl border-t-2 flex flex-col items-center justify-center p-2 shadow-md ${podiumStyles}`}>
+                        <span className="font-pixelTitle text-sm">#{rank}</span>
+                        <span className="text-[10px] font-extrabold opacity-95 mt-0.5">{getMetricLabel(u)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Remaining Ranked List */}
+            <div className="space-y-2">
+              {(searchQuery.trim() ? rankedUsers : rest).map((u, idx) => {
+                const actualRank = searchQuery.trim() ? idx + 1 : idx + 4;
+                const dino = getDinoById(u.selectedDinoId || 1);
+                const isMe = u.id === currentUid;
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => setSelectedUser(u)}
+                    className={`bouncy-tap w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${
+                      isMe
+                        ? 'bg-ace-green-light/70 dark:bg-emerald-950/40 border-ace-green'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-ace-green/50'
+                    }`}
+                  >
+                    <span className="w-7 text-center text-xs font-black text-slate-400">#{actualRank}</span>
+                    <img src={dino.img} alt="" className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 object-contain shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">
+                          {u.displayName || u.name}
+                        </span>
+                        {isMe && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-ace-green text-white">YOU</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-0.5">
+                        <span className="flex items-center gap-0.5"><Flame className="w-3 h-3 text-amber-500" /> {u.streak || 0}d</span>
+                        <span className="flex items-center gap-0.5"><Clock className="w-3 h-3 text-sky-500" /> {Math.round((u.totalStudySeconds || 0) / 60)}m</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-black text-ace-green">{getMetricLabel(u)}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        ))}
+          </>
+        )}
       </div>
 
+      {/* User Profile Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div className="p-4 bg-gradient-to-r from-ace-green to-emerald-600 text-white flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <img
+                  src={getDinoById(selectedUser.selectedDinoId || 1).img}
+                  alt=""
+                  className="w-14 h-14 rounded-2xl bg-white/20 p-1.5 object-contain"
+                />
+                <div>
+                  <h3 className="font-extrabold text-base">{selectedUser.displayName || selectedUser.name}</h3>
+                  <p className="text-xs text-emerald-100">{selectedUser.handle || `ID #${selectedUser.id}`}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedUser(null)} className="p-1.5 rounded-full bg-white/20">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                  <div className="text-base font-black text-amber-500">{selectedUser.streak || 0}d</div>
+                  <div className="text-[10px] font-bold text-slate-400">Streak</div>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                  <div className="text-base font-black text-ace-green">{selectedUser.xp || 0}</div>
+                  <div className="text-[10px] font-bold text-slate-400">XP</div>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                  <div className="text-base font-black text-sky-500">{selectedUser.testsAttempted || 0}</div>
+                  <div className="text-[10px] font-bold text-slate-400">Tests</div>
+                </div>
+              </div>
+
+              {selectedUser.id !== currentUid && onStartDirectChat && (
+                <button
+                  onClick={() => {
+                    const target = selectedUser;
+                    setSelectedUser(null);
+                    onStartDirectChat(target);
+                  }}
+                  className="w-full py-3 rounded-2xl bg-ace-green hover:bg-green-700 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-ace-green/20"
+                >
+                  <MessageCircle className="w-4 h-4" /> Send Direct Message
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

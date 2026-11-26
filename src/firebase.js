@@ -1,23 +1,36 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  onSnapshot, 
-  query, 
-  where 
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  limit,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove,
+  increment,
+  Timestamp
 } from 'firebase/firestore';
-import { 
-  getAuth, 
-  signInAnonymously, 
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged 
+  onAuthStateChanged
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -29,10 +42,11 @@ const firebaseConfig = {
   appId: "1:757607804857:web:aceyourexam"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export {
   collection,
@@ -40,10 +54,22 @@ export {
   getDocs,
   getDoc,
   setDoc,
+  addDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   query,
   where,
+  orderBy,
+  limit,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove,
+  increment,
+  Timestamp,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,

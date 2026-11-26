@@ -18,6 +18,10 @@ export default {
           'sky-light': '#E0F2FE',
           orange: '#F59E0B',
           'orange-light': '#FEF3C7',
+          red: '#EF4444',
+          yellow: '#FBBF24',
+          cyan: '#0891B2',
+          blue: '#2563EB',
           bg: '#F8FAFC',
           surface: '#FFFFFF',
           text: '#0F172A',
@@ -28,6 +32,8 @@ export default {
       fontFamily: {
         sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        pixel: ['VT323', 'monospace'],
+        pixelTitle: ['"Press Start 2P"', 'monospace'],
       }
     },
   },

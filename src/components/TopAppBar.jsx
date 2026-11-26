@@ -6,6 +6,7 @@ export default function TopAppBar({
   streakCount = 1, 
   diamonds = 100, 
   onDiamondsClick, 
+  onStreakClick,
   onSearchClick,
   isSearching = false
 }) {
@@ -37,10 +38,14 @@ export default function TopAppBar({
         <div className="flex items-center gap-2">
           
           {/* Streak Flame Pill */}
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60 text-orange-600 dark:text-orange-400 font-extrabold text-xs shadow-xs">
+          <button
+            onClick={onStreakClick}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60 text-orange-600 dark:text-orange-400 font-extrabold text-xs shadow-xs active:scale-95 transition-transform"
+            title="Study Streak Calendar"
+          >
             <Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-500 animate-pulse" />
             <span>{streakCount}</span>
-          </div>
+          </button>
 
           {/* Diamonds Wallet Pill */}
           <button

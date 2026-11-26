@@ -13,7 +13,13 @@ import {
   Flame,
   ArrowRight,
   TrendingUp,
-  Award
+  Award,
+  Bell,
+  Clock,
+  FileCheck2,
+  Target,
+  PlayCircle,
+  Star
 } from 'lucide-react';
 
 const GOAL_TABS = [
@@ -55,12 +61,14 @@ export default function HomeScreen({
   onSelectExam, 
   allFolders = [], 
   allTests = [],
-  diamonds = 100
+  homeBanners = [],
+  diamonds = 100,
+  onQuickAction
 }) {
   const [selectedGoal, setSelectedGoal] = useState('COMPETITIVE');
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
 
-  const promoBanners = [
+  const defaultBanners = [
     {
       id: 1,
       title: 'SSC CGL & CHSL 2026 Live Series',
@@ -83,6 +91,16 @@ export default function HomeScreen({
       bgGradient: 'from-[#7c2d12] to-[#ea580c]'
     }
   ];
+
+  const promoBanners = homeBanners.length > 0
+    ? homeBanners.map((b, i) => ({
+        id: b.id || i,
+        title: b.title || b.heading || 'AceYourExam Update',
+        subtitle: b.subtitle || b.description || '',
+        tag: b.tag || 'FEATURED',
+        bgGradient: i % 3 === 0 ? 'from-[#0F4739] to-[#16A34A]' : i % 3 === 1 ? 'from-[#1e3a8a] to-[#2563eb]' : 'from-[#7c2d12] to-[#ea580c]'
+      }))
+    : defaultBanners;
 
   // Auto scroll banners
   useEffect(() => {
@@ -159,6 +177,36 @@ export default function HomeScreen({
           ))}
         </div>
       </div>
+
+      {/* QUICK ACCESS FEATURE STRIP (Matching Android LessonScreen) */}
+      {onQuickAction && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {[
+            { id: 'notice_board', label: 'Notices', icon: Bell, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
+            { id: 'focus', label: 'Focus', icon: Clock, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
+            { id: 'attempted_tests', label: 'Attempted', icon: FileCheck2, color: 'text-sky-600 bg-sky-50 dark:bg-sky-950/40' },
+            { id: 'set_target', label: 'Set Target', icon: Target, color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40' },
+            { id: 'video_sessions', label: 'Videos', icon: PlayCircle, color: 'text-rose-600 bg-rose-50 dark:bg-rose-950/40' },
+            { id: 'bookmarks', label: 'Saved Qs', icon: Star, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' }
+          ].map(item => {
+            const QIcon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onQuickAction(item.id)}
+                className="bouncy-tap bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-2.5 flex flex-col items-center gap-1.5 shadow-xs hover:border-ace-green/50"
+              >
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${item.color}`}>
+                  <QIcon className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 truncate w-full text-center">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 2. THE 4 GOAL SELECTOR TABS (Matching Android LessonScreen.kt) */}
       <div className="bg-[#F8FAFC] dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between gap-1">
